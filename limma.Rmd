@@ -1,0 +1,139 @@
+---
+title: "limma"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+opts_chunk$set(eval=FALSE)
+```
+
+**Purpose**: Analysis of gene expression data from microarrays or RNA-Seq platform technologies
+**Citations**: 
+    * [Smyth et al. (2004)](http://www.ncbi.nlm.nih.gov/pubmed/16646809) 
+    * [Ritchie et al. (2015)](http://nar.oxfordjournals.org/content/early/2015/02/10/nar.gkv007)
+
+To install the limma R/Bioconductor package
+```{r}
+source("http://bioconductor.org/biocLite.R")
+biocLite("limma")
+library(limma)
+```
+
+# Data Classes in limma
+
+* `RGList` = raw intensities from a two-color array (red-green list). Usually created by `read.maimages()`. 
+* `MAList` = M-values (log-ratios) and A-values (average intensities) converted from the two-color intensities. Usually created from an `RGList` using `normalizeWithinArrays()`. 
+* `EListRaw` = raw intensities for a one-channel microarray. e.g. created by `read.maimages()`, `read.ilmn()`. 
+* `EList` = background corrected and normalized log2 expression values for a one channel microarray. Usually created from an `EListRaw` object using `normalizeBetweenArrays()` or `neqc()`. 
+* `MArrayLM` = Object resulting from linear models fit for each gene. Usually created by `limFit()`. 
+* `TestResults` = Results of testing a set of contrasts equal to zero for each probe. 
+
+# Reading in Data
+
+Example: 
+```{r}
+targets <- readTargets("pdata.txt") # read in target data
+RG <- read.maimages(targets, source = "genepix") # read in raw intensities 
+```
+
+* `readTargets()` = reads in the phenotypic information corresponding to RNA samples. Each row represents one sample and each column are covariates associated with each sample. 
+
+#### Reading in Intensity Data
+
+* `read.maimages()` = reads in one or two color microarray data. Creates either an `RGList` or `EListRaw` object. 
+* `read.idat()` = reads in Illumina IDAT files. Creates an `EListRaw` object. 
+
+#### Reading in Probe Annotation Data
+
+* `readGAL()` = reads in the most common format for probe annotation files which is the GenePix Array List (GAL) file format. 
+
+
+# Background correction and Normalization
+
+Example: 
+```{r}
+RG <- backgroundCorrect(RG, method = "normexp") # adaptive background correction
+MA <- normalizeWithinArrays(RG) # print-tip loess normalization
+```
+
+#### Background correction
+
+* `backgroundCorrect()` = background correction for single-color or two-color microarrays. Uses `movingmin` method (moving average) or `normexp` method (fits Normal+Exponential convolution model to observed intensities) 
+* `kooperberg()` = Bayesian background correction for two-color GenePix data
+* `neqc()` = background correction for single-color data. Performs `normexp` background correction and quantile normalization using control probes. 
+
+#### Normalization
+
+* `normalizeWithinArrays()` = normalization within arrays to make the log-ratio average equal 0. 
+    * Method choices: none, median, loess, printtiploess, composite, control and robustspline. 
+* `normalizeBetweenArrays()` = normalization between arrays to make the intensities or log-ratios have similar distributions. Usually performed after `normalizeWithinArrays()`. 
+    * Method choices for single-color arrays: none, scale (scales columns to have same median), quantile or cyclicloess (loess normalization to all possible pairs of arrays)
+    * Method choices for two-color arrays: the methods above and Aquantile (quantile normalization of A-values), Gquantile, Rquantile, Tquantile (quantile normalization separated for each group. 
+
+
+#### Other approaches
+
+* `normalizeVSN()` = variance stablizing normalization. Performs background correction and normalization simultaneously. 
+* `removeBatchEffect()` = method to remove batch effects prior to clustering or unsupervised analysis. For linear modeling, do not use this (rather inclue batch effects in linear model). 
+
+
+# Linear Models
+
+Example: 
+```{r}
+fitModel <- lmFit(MA, design = ...) # fit a linear model for each gene
+fitModel <- eBayes(fitModel) # apply empirical Bayes smoothing to standard error
+topTable(fitModel) # show top 10 genes differentially expressed
+```
+
+* `lmFit()` = estimates a linear model for each gene. Also calculates the residual error. 
+    * Needs to inputs: (1) expression matrix and (2) design matrix. Outputs an `MArrayLM` object. 
+    * Two choices in estimation procedure:
+        * `ls` = least-squares estimates for each gene
+        * `robust` = robust regression using the `rlm()` function in the MASS package
+* `eBayes()` = calculates the likelihood that a residual error would be seen by chance, and the likelihood that the gene is differentially expressed. 
+
+#### Summarizing model fits
+
+* `topTable()` = summarizes model fits by creating a table of the top genes (10 by default) mostly likely to be differentially expressed. 
+* `topTableF()` = list of gene most likely to be differentially expressed for a given set of contrasts.
+* `volcanoplot()` = volcano plot of fold change versus the B-statistic (log-odds that the gene is differentially expressed) for any fitted coefficient
+* `plotlines()` = plots fitted coefficients for time-course data
+
+
+# Diagnostics and quality assessment
+
+* `plotMA()` or `plot.MAList()` = MA-plot with color coding for control probes
+* `imageplot()` = spatial plot of spot-specific measurements
+* `plotDensities()` = plots the expression value densities for all arrays in a matrix. Also accepts `RGList`, `MAList`, `EListRaw` and `EList`. 
+* `plotMDS()` = multidimensional scaling plot for arrays
+* `plotSA()` = Plots the variance vs A-values to check for variance across intensity levels
+* `plotFB()` = plots foreground vs background log-intensities
+    
+    
+# Using limma for RNA-Seq Data
+
+**Main idea**: Apply the [voom](http://genomebiology.com/2014/15/2/R29) transformation to read counts from RNA-Seq data which converts counts to log-counts per million with associated precision weights. Allows for RNA-Seq data to be analyzed similar to microarray data. 
+
+Example (assuming a `count` matrix has been created): 
+```{r}
+# No normalization; Using raw counts
+v <- voom(counts, design = ..., plot = TRUE)
+
+# Applying quantile normalization between samples
+v <- voom(counts, design = ..., plot = TRUE, normalize = "quantile")
+
+# Uses TMM normalization in the edgeR package
+dge <- DGEList(counts = counts) # creates a DGEList object from edgeR
+dge <- calcNormFactors(dge) # calculates normalization factors to scale raw library sizes
+v <- voom(dge, design = ..., plot = TRUE) # applies voom transformation to count data and produces an EList object
+```
+
+Now use limma on voom transformed counts: 
+```{r}
+fitModel <- lmFit(v, design = ...) 
+fitModel <- eBayes(fitModel) 
+topTable(fitModel, coef = ncol(design))
+```
+
+```

@@ -8,9 +8,11 @@ opts_chunk$set(eval=FALSE)
 ```
 
 **Purpose**: Analysis of gene expression data from microarrays or RNA-Seq platform technologies
+
 **Citations**: 
-    * [Smyth et al. (2004)](http://www.ncbi.nlm.nih.gov/pubmed/16646809) 
-    * [Ritchie et al. (2015)](http://nar.oxfordjournals.org/content/early/2015/02/10/nar.gkv007)
+
+    * [Smyth et al. (2004)](http://www.ncbi.nlm.nih.gov/pubmed/16646809) - for limma software package itself
+    * [Ritchie et al. (2015)](http://nar.oxfordjournals.org/content/early/2015/02/10/nar.gkv007) - using limma for differential expression analysis
 
 To install the limma R/Bioconductor package
 ```{r}
@@ -87,11 +89,11 @@ topTable(fitModel) # show top 10 genes differentially expressed
 ```
 
 * `lmFit()` = estimates a linear model for each gene. Also calculates the residual error. 
-    * Needs to inputs: (1) expression matrix and (2) design matrix. Outputs an `MArrayLM` object. 
+    * Needs two inputs: (1) expression matrix and (2) design matrix. Outputs an `MArrayLM` object. 
     * Two choices in estimation procedure:
         * `ls` = least-squares estimates for each gene
         * `robust` = robust regression using the `rlm()` function in the MASS package
-* `eBayes()` = calculates the likelihood that a residual error would be seen by chance, and the likelihood that the gene is differentially expressed. 
+* `eBayes()` = calculates the likelihood that a residual error would be seen by chance and the likelihood that the gene is differentially expressed. 
 
 #### Summarizing model fits
 
@@ -107,7 +109,7 @@ topTable(fitModel) # show top 10 genes differentially expressed
 * `imageplot()` = spatial plot of spot-specific measurements
 * `plotDensities()` = plots the expression value densities for all arrays in a matrix. Also accepts `RGList`, `MAList`, `EListRaw` and `EList`. 
 * `plotMDS()` = multidimensional scaling plot for arrays
-* `plotSA()` = Plots the variance vs A-values to check for variance across intensity levels
+* `plotSA()` = Plots the variance vs A-values to check for constant variance across intensity levels
 * `plotFB()` = plots foreground vs background log-intensities
     
     
@@ -134,6 +136,4 @@ Now use limma on voom transformed counts:
 fitModel <- lmFit(v, design = ...) 
 fitModel <- eBayes(fitModel) 
 topTable(fitModel, coef = ncol(design))
-```
-
 ```

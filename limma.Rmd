@@ -11,8 +11,8 @@ opts_chunk$set(eval=FALSE)
 
 **Citations**: 
 
-    * [Smyth et al. (2004)](http://www.ncbi.nlm.nih.gov/pubmed/16646809) - for limma software package itself
-    * [Ritchie et al. (2015)](http://nar.oxfordjournals.org/content/early/2015/02/10/nar.gkv007) - using limma for differential expression analysis
+* [Smyth et al. (2004)](http://www.ncbi.nlm.nih.gov/pubmed/16646809) - for limma software package itself
+* [Ritchie et al. (2015)](http://nar.oxfordjournals.org/content/early/2015/02/10/nar.gkv007) - using limma for differential expression analysis
 
 To install the limma R/Bioconductor package
 ```{r}
@@ -50,7 +50,7 @@ RG <- read.maimages(targets, source = "genepix") # read in raw intensities
 * `readGAL()` = reads in the most common format for probe annotation files which is the GenePix Array List (GAL) file format. 
 
 
-# Background correction and Normalization
+# Background Correction and Normalization
 
 Example: 
 ```{r}

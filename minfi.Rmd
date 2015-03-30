@@ -1,0 +1,258 @@
+---
+title: "minfi"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+opts_chunk$set(eval=FALSE)
+```
+
+**Purpose**: Tools for analyzing and visualizing Illumina's 450k array data. 
+
+* Preprocessing, QC assessments, identification of interesting methylation loci and plotting functionality for 450k arrays for humans (27k arrays not supported). 
+* Type II design = single probe, two different colors (red & green)
+* Highly suggested: a "sample sheet" in CSV format describing layout of experiment (from Illumina)
+
+
+**Citations**: 
+
+* [Aryee et al. (2014)](http://bioinformatics.oxfordjournals.org/content/30/10/1363.long) - for limma software package itself
+* [Maksimovic et al. (2012)](http://genomebiology.com/2012/13/6/r44) - SWAN normalization
+* [Fortin et al. (2014)](http://genomebiology.com/2014/15/12/503) - Functional normalization
+
+
+To install the minfi R/Bioconductor package
+```{r}
+source("http://bioconductor.org/biocLite.R")
+biocLite("minfi")
+library(minfi)
+require(minfiData) # only if you need access to the example datasets
+```
+
+# Data Classes in minfi
+
+* `*.IDAT` file = binary files from Illumina arrays
+* manifest object = describes what probes are on the array and how they are matched together. Only depends on the array design (not related to annotating the CpGs measured by the array). 
+* `RGChannelSet` = raw intensities from the two-color array. Contains two matrices representing the red and green intensities. Also contains info about control probes (QC probes)
+* `IlluminaMethylationManifest` = contains info about array design and how color and probes pair at each CpG site
+* `MethylSet` = `RGChannelSet` + `IlluminaMethylationManifest`. Contains two preprocessed normalized matrices (methylation & unmethylation evidence for each CpG). This object is the starting point for searching for differentially methylated probes (DMPs) or differentially methylated regions (DMRs). 
+* `GenomicMethylSet` = contains genomic coordinates for probes. Use `getLocations()` or `mapToGenome()` to convert `MethylSet` to `GenomicMethylSet`. Can use functions in `GenomicRanges` package with this object. 
+* `GenomicRatioSet` = This class holds preprocessed data for Illumina methylation microarrays, mapped to a genomic location. Use `ratioConvert(Mset, what = “both”, keepCN = TRUE)`
+    * ratio set needs to have either Beta, M values or both
+* `RatioSet` = contains matrix of beta values, M values and CN estimates
+
+
+
+# Reading in Data
+
+Here we read in the phenotypic data using sample sheet information given from Illumina
+
+Example: 
+```{r}
+baseDir <- "/path/to/base/directory/where/idat/files/are" 
+list.files(baseDir) # Contains idat folders and target file
+list.files(file.path(baseDir, "5723646052")) # shows idat files 
+targets <- read.450k.sheet(baseDir) # targets 
+sub(baseDir, "", targets$Basename) # Basename column = describes the location of the IDAT file corresponding to the sample
+RGset <- read.450k.exp(base = baseDir, targets = targets) # reads in raw intensities
+pd <- pData(RGset)
+```
+
+* `read.450k.sheet()` = reads in the target information. Typically this is a `.csv` or `.txt` file that contains the phenotypic information (columns) for each of the samples (rows). 
+
+
+#### Reading in IDAT Data
+
+* `read.450k(basenames)` = reads in `.idat` files for a given set of basenames (files without ending in `_Grn.idat` or `_Red.idat`). Creates and `RGChannelSet` object
+* `read.450k.exp()` = Reads in `.idat` files from an entire experiment using a sample sheet. Creates an `RGChannelSet` object
+
+
+# Extracting Data
+
+Uses `RGChannelSet` object
+
+* `pData()` = extracts phenotype information
+* `getManifest(object)` = extracts the manifest associated with object
+* `getProbeInfo(object)` = returns data from with Type I, Type II or control probes from a `IlluminaMethylationManifest` object. 
+
+Use `[Genomics]MethylSet` or `GenomicRatioSet` object
+
+* `getMeth()` and `getUnMeth()` = If `[Genomics]MethylSet`, returns unlogged methylation channels. Not possible to get this from `GenomicRatioSet`. 
+* `getBeta(object, type, offset, betaThreshold)` = calculates "beta"-values ranging between 0 and 1 (where 1 = high methylation). If type = "Illumina", these are Beta = M / (M + U + 100)
+
+\[ \beta = \frac{M}{M + U + offset} \]
+
+* `getM()` = calculates "M-values" = logit($\beta$)
+* `getCN()` = copy number values which are sum of methy and unmeth channels
+* `sampleNames()` = get column names
+* `featureNames()` = get row names
+* `annotation()` = get annotation 
+* `preprocessMethod()` = get preprocess method used
+* `mapToGenome()` = If `RGChannelSet`, the object is normalized using `preprocessRAW()` and transformed into a `MethylSet` and mapped to genome. If `MethylSet`, the object is mapped to the genome. If `GenomicMethylSet`, then this simply returns the object unchanged. If or `GenomicRatioSet`, this is ignored. 
+* `ratioConvert(object, what = c("Beta", "M"))` = converts meth and unmeth channels to ratios (Beta and M values). Object can be a `MethylSet` or `GenomicRatioSet`. 
+
+
+#### Mapping `MethylSet` to `GRanges` or `Genomic MethylSet` object
+
+
+
+#### Extracting annotations
+
+```{r}
+getIslandStatus(Mset)
+```
+
+* `getAnnotation(object, what = "everything")` = returns annotations
+* `getLocations(object)` = returns locations as a `GRanges` object
+* `getSnpInfo(object)` = returns a `DataFrame` containing info on which probes contain SNPs.
+* `dropLociWithSnps(objects, snps = c("CpG", "SBE"), maf = 0)` = removes loci with SNPs based on their minor allele frequency (maf). 
+* `getProbeType(object)`
+* `getIslandStatus(object, islandAnno = NULL)`
+
+# Quality Control and Diagnostics
+
+**Purpose**: Create plots to identify samples with data quality problems. e.g. Plot the median of the methylation against unmethylated samples; check for outlier arrays if points far away from cluster of points
+
+Example: 
+```{r}
+densityPlot(RGset, sampGroups = pd$Groups)
+densityBeanPlot(RGset, sampGroups = pd$Groups, sampNames = pd$Names)
+controlStripPlot(RGset)
+mdsPlot(RGset)
+```
+
+* `mdsPlot(object, numPositions = 1000, sampGroups, sampNames)` = Create multi-dimensional scaling (MDS) plots to see relationship between samples. Displays 2D approx of sample-to-sample Euclidean distance. Object can be an `RGChannelSet`, `MethylSet` or `matrix`. Uses `getBeta()` for first two objects. 
+* `qcReport()` = produces a PDF QC report of most common plots; samples within a group are assigned the same color (e.g. batch effects)
+* `densityPlot(object, sampGroups)` = density plots of the methylation Beta values for all samples (colored by group). In general, methylation profiles will have two modes (close to 0% meth & 100% meth).
+* `densityBeanPlot(object, sampGroups, sampNames)` = If concerned about a sample, use "bean" plot (shows each sample in its own section). Object can be `RGChannelSet`, `MethylSet` or `matrix`. 
+* `controlStripPlot(RGset, controls = c("BISULFITE CONVERSION I", "BISULFITE CONVERSION II"))` = strip plots for individual control probe types 
+* `getQC(object)` = estimates sample-specific quality control information for a `[Genomic]MethylSet` object. 
+* `plotBetasByType(object)` = Plot the overall distribution of beta values and the distributions of the Infinium I and II probe types. Object can be a `MethylSet`, `matrix` or `vector`. Uses the `getBeta()` function in the first case. 
+* `plotCpg(object, cpg, pheno = pd$Group, type = c("categorical", "continuous"), measure = c("beta", "M"))` = plot methylation values at a single genomic position. `cpg` is a character vector of the CpG position to be plotted. 
+
+```{r}
+qc <- getQC(Mset)
+Mset <- addQC(Mset, qc = qc)
+plotQC(qc, badSampleCutoff = 10.5)
+```
+
+# Normalization
+
+**Purpose**: Takes input an `RGChannelSet` with raw methylation values and outputs normalized values in a `MethylSet` object.
+
+Example: 
+```{r}
+MSet.raw <- preprocessRaw(RGset)
+MSet.norm <- preprocessIllumina(RGset) # normalization from Genome Studio
+Mset.quantile <- preprocessQuantile(RGset) # quantile normalization
+Mset.funnorm <- preprocessFunnorm(RGset) # functional normalization
+
+Mset.quantile <- fixMethOutliers(Mset.quantile)
+```
+
+#### Normalization
+
+Input `RGChannelSet` object and output a `MethylSet` object using processes called `preprocessXXX()`
+
+1. `preprocessRaw()` = converts Red and Green channel to Methy & Unmethy signal without any normalization. Returns a `MethylSet` object. Need to use `getLocations()` or `mapToGenome()` for genomic locations.
+2. `preprocessIllumina()` = background subtraction (also called control normalization). No across array normalization. `betaThreshold` = thresholds beta values between (epsilon, 1 - epislon). Returns a `MethylSet` object. Need to use `getLocations()` or `mapToGenome()` for genomic locations. 
+3. `preprocessQuantile()` = stratified quantile normalization (probes are stratified by region e.g. CpG island, shore, etc). Returns a `GenomicRatioSet` object. Can be used in `rowData()` directly for genomic locations
+4. `preprocessFunnorm(RGset)` = functional normalization is a between-array normalization. Removes unwanted variablity by regressing out variabliy explained by the control probes on array usin the first $k$ principal components. 
+5. `preprocessNoob(RGset)` = Noob background correction method with dye-bias normalization 
+6. `preprocessSWAN(RGset)` = subset-quantile within array normalization (SWAN) is a within array normalization method. Allows for Type I and Type II probes on a single array to be normalized together. 
+
+
+#### Fix outliers
+
+* `fixMethOutliers(object)` = identifies methylation outliers (extreme Meth or Unmethy channels) in a `[Genomic]MethylSet` object and thresholds them at a cutoff. 
+
+
+
+# Finding differentially methylated probes (DMPs):
+
+**Purpose**: Use normalized data to identify DMPs (CpGs positions where methylation level correlated with phenotype of interest)
+
+Example: 
+```{r}
+dmpFinder(Mset, pheno = pd$Group, type = "categorical")
+```
+
+* `cpgCollapse(object, what = "Beta", maxGap = 300)` = clusters adjacent loci with a specified `maxGap` between CpGs. Object should be a `[Genomic]MethylSet`. 
+* `dmpFinderobject, pheno, type=c("categorical", "continuous"), shrinkVar = TRUE)` = uses F-test to identify DMPs between 2 or more groups if covariate `type=categorical` or linear regression if `type=continuous`. Performed using logit transformed Beta values. Object can be a `MethylSet` or `matrix`. `shrinkVar` recommended when number of samples < 10 (sample variances are squeezed using empirical Bayes posterior means using the `limma` R/Bioconductor package. Returns a table with one row per CpG. 
+
+
+# Finding differentially methylated regions (DMRs): 
+
+Example:
+```{r}
+tab <- blockFinder(Y, X, coef = 2, what = "Beta", cutoff = 0.1, smooth = TRUE, smoothFunction = loessByCluster)
+names(tab)
+# tab$table; tab$coef, tab$fitted, tab$algorithm
+```
+
+* `blockFinder(object, design = ...)` = Finds blocks of methylation differences for in a `GenomicRatioSet` object. This function is similar to bumphunter() using regions (~ 1kb in length) except the function first clusters CpG probes into blocks (~ 1Mb in length) and then runs using bumphunterEngine. It fits a linear model for each location, focusing on one specific column (coefficient) of the design matrix. This coefficient of interest is optionally smoothed. Subsequently, a permutation test is formed for this specific coefficient. Output table of candidate regions with permutation=based family-wide error rates.
+* `bumphunter(object, design = ...)` = Finds DMRs or where a genomic profile deviates from its baseline. Returns a class of `bumps`. See [bumphunter](http://www.bioconductor.org/packages/release/bioc/html/bumphunter.html) for futher details. 
+
+
+# Estimating cell proportions
+
+```{r}
+counts <- estimateCellCounts(RGset, meanPlot = FALSE)
+round(counts, 2)
+```
+
+* `estimateCellCounts(RGset, compositeCellType = "Blood", cellTypes = c("CD8T","CD4T", "NK","Bcell","Mono","Gran"))` = Estimates the relative proportion of pure cell types within a sample. For example, given peripheral blood samples, this function will return the relative proportions of lymphocytes, monocytes, B-cells, and neutrophils. The `RGChannelSet` is passed to `preprocessQuantile()` for normalization.  The method itself is from Houseman et al. (2012) which uses a constrained linear regression model for estimation. 
+
+Generally, the method works in the following way: 
+
+* runs `rowFtests()` to test if 6 cell types are different & computes mean & ranges of each cell type
+* run `rowttests()` by cell type to test if one cell type is different than the rest. Filter for p-value only < 1e-8.  Pick largest 50 pos and 50 neg mean differences. 
+* list of 600 probes
+* using the 600 probes, estimate a constrained linear regression model to estimate the coefficients for 6 cell types
+
+
+# Estimating sex
+
+```{r}
+getSex(Mset)
+```
+
+* `getSex(object, cutoff)` = estimates sample sex based using a `[Genomic]MethylSet` object. `cutoff` is the difference in log2 CN between male and females. 
+
+
+
+# shinyMethyl
+
+**Goal**: interactive visualization tool for Illumina 450K methylation array data based on minfi and shiny summarize a high-dim 450K array into an R object. Launches an interactive viz tool for QC assessment & global methylation patterns. 
+
+#### Example data in shinyMethylData R package
+369 head & neck TCGA samples (310 tumors, 50 matched normals, 9 replicates of a control cell line)
+
+* raw data: `summary.tcga.raw.rda`
+* normalized data: `shinyMethylSet`
+
+Main functions
+
+* `runShinyMethyl()` = creates shinyMethyl object
+* `shinySummarize()` = launches shinyMethyl interface
+* `slotNames()`
+
+Example: 
+```{r}
+library(shinyMethyl)
+library(shinyMethylData)
+runShinyMethyl(summary.tcga.raw, summary.tcga.norm # will take a few mins to launch
+
+# Using your own RGSet objects (from minfi)
+summary <- shinySummarize(RGSet) 
+runShinyMethyl(summary)
+
+# Using a GenomicRatioSet object 
+GRSet.norm <- preprocessQuantile(RGSet)
+summary.norm <- shinySummarize(GRS.norm)
+rawShinyMethyl(summary, summary.norm) # first arg is raw data, second arg is the norm data
+```
+
+
+
+

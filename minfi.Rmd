@@ -142,29 +142,14 @@ plotQC(qc, badSampleCutoff = 10.5)
 
 Example: 
 ```{r}
-<<<<<<< HEAD
-=======
-Mset <- fixMethOutliers(Mset)
-
->>>>>>> 4f08ce84568b2e2dc5eb8415712b0b57138ac1fe
 MSet.raw <- preprocessRaw(RGset)
 MSet.norm <- preprocessIllumina(RGset) # normalization from Genome Studio
 Mset.quantile <- preprocessQuantile(RGset) # quantile normalization
 Mset.funnorm <- preprocessFunnorm(RGset) # functional normalization
-<<<<<<< HEAD
 
 Mset.quantile <- fixMethOutliers(Mset.quantile)
 ```
 
-=======
-```
-
-#### Preprocessing
-
-* `fixMethOutliers(object)` = identifies methylation outliers (extreme Meth or Unmethy channels) in a `[Genomic]MethylSet` object and thresholds them at a cutoff. 
-
-
->>>>>>> 4f08ce84568b2e2dc5eb8415712b0b57138ac1fe
 #### Normalization
 
 Input `RGChannelSet` object and output a `MethylSet` object using processes called `preprocessXXX()`
@@ -176,14 +161,9 @@ Input `RGChannelSet` object and output a `MethylSet` object using processes call
 5. `preprocessNoob(RGset)` = Noob background correction method with dye-bias normalization 
 6. `preprocessSWAN(RGset)` = subset-quantile within array normalization (SWAN) is a within array normalization method. Allows for Type I and Type II probes on a single array to be normalized together. 
 
-
-<<<<<<< HEAD
 #### Fix outliers
 
 * `fixMethOutliers(object)` = identifies methylation outliers (extreme Meth or Unmethy channels) in a `[Genomic]MethylSet` object and thresholds them at a cutoff. 
-
-=======
->>>>>>> 4f08ce84568b2e2dc5eb8415712b0b57138ac1fe
 
 
 # Finding differentially methylated probes (DMPs):
@@ -253,11 +233,7 @@ Main functions
 
 * `runShinyMethyl()` = creates shinyMethyl object
 * `shinySummarize()` = launches shinyMethyl interface
-<<<<<<< HEAD
 * `slotNames()`
-=======
-* `slotNames()` = 
->>>>>>> 4f08ce84568b2e2dc5eb8415712b0b57138ac1fe
 
 Example: 
 ```{r}

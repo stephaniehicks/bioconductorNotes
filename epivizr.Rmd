@@ -1,0 +1,62 @@
+---
+title: "epivizr"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+opts_chunk$set(eval=FALSE)
+```
+
+**Purpose**: Interactive visualization of genomic data in a browser. Supports Bioconductor data structures such as `GenomicRanges` and `SummarizedExperiments`. 
+
+**Citations**: 
+
+* [Chelaru et al. (2014)](http://www.nature.com/nmeth/journal/v11/n9/full/nmeth.3038.html) 
+
+To install the `epivizr` R/Bioconductor package
+```{r}
+source("http://bioconductor.org/biocLite.R")
+biocLite("epivizr")
+library(epivizr)
+```
+
+# `epivizr` Workflow
+
+```{r}
+mgr <- startEpiviz() # Opens epiviz in the browser and starts a new session
+
+# Line plot of methylation data at base-pair resolution 
+mgr$addDevice(GRangesObject, "450kMeth", type="bp", columns = IDs)
+
+# Scatter plot comparing the M-values and A-values in an MA plot
+mat # data frame with "Avals" and "Mvals" as column names
+assayDataElement(GRangesObject, "MA") <- mat
+show(GRangesObject)
+mgr$addDevice(GRangesObject, "MAPlot", columns = c("Avals", "Mvals"), assay = "MA")
+
+
+mgr$stopServer() # closing the epiviz session
+```
+
+#### Starting a new epiviz session
+
+* `startEpiviz()` = opens epiviz in the browser and starts a new interactive session between R and the browser
+
+#### Examples
+
+* `mgr$addDevice(GRangesObject, "450kMeth", type="bp", columns = ...)` = Line plot of methylation data at base-pair resolution 
+* `mgr$addDevice(GRangesObject, "MAPlot", columns = ..., assay = ...)` = Scatter plot (MA plot) using an `MA` data frame that was added using `assayDataElement(GRangesObject, "MA") <- mat` where `mat` has columns `Avals` and `Mvals`. 
+* 
+
+#### Other
+
+* `mgr$rmAllDevices()` = removes all plots added in current session
+* `mgr$listDevice()` = list all devices added in current session
+* `mgr$navigate(chr = ..., start = ... , end = ...)` = Move to a specific region in the genome defined by `chr`, `start` and `end`
+* `mgr$slideshow(regionsObject, n = ...)` = create a slide show of the top n regions 
+     
+
+#### Closing an epiviz session
+
+* `mgr$stopServer()` = closes the epiviz interactive session betwee R and the browser
+

@@ -31,7 +31,7 @@ From here you can use, for example, `ReadAffy()` to read in the CEL files.
 
 
 ### Access GSE Data Tables from GEO
-To access the phenotypic information about the samples, the best way is to use `getGEO()` function to obtain the GSE object and then extract the phenoData object from that.  Unfortunately this means downloadint the entire GSE Matrix file.  
+To access the phenotypic information about the samples, the best way is to use `getGEO()` function to obtain the GSE object and then extract the phenoData object from that.  Unfortunately this means downloading the entire GSE Matrix file.  
 
 ```{r}
 dim(pData(gse[[1]]))

@@ -1,0 +1,137 @@
+---
+title: "monocle"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+opts_chunk$set(eval=FALSE)
+```
+
+**Purpose**: Differential expression and time series analysis for single-cell RNA-Seq data
+
+**Citations**: 
+
+* [Trapnell et al. (2014)](http://www.ncbi.nlm.nih.gov/pubmed/24658644) - for information on the core algorithm in monocle
+
+To install the monocle R/Bioconductor package
+```{r}
+source("http://bioconductor.org/biocLite.R")
+biocLite("monocle")
+library(monocle)
+```
+
+# Pre-process outside of monocle
+
+Before using monocle, the gene expression values must be pre-processed. Monocle **cannot** use raw counts and assumes gene expression is log-normally distributed. It also assumes gene expression has been already normalized for library size, sequencing depth, or other sources of technical variability. 
+
+# Data Classes in monocle
+
+* `CellDataSet` = This class holds the pre-processed expression values. Class structure is derived from the `ExpressionSet` class in Biocoductor. To create a `CellDataSet` object, use `newCellDataSet()` and provided three data sets: 
+    * `exprs` = numeric matrix of expression values (rows = genes, columns = cells)
+    * `phenoData` = An `AnnotatedDataFrame` describing phenotypic information for each cell (group, batch, etc)
+    * `featureData` = An `AnnotatedDataFrame` describing gene-level information for each gene (e.g. gc content, ensemble gene name, etc)
+
+
+# Reading in Data
+
+Here we read in the phenotypic data using sample sheet information given from Illumina
+
+Example: 
+```{r}
+exprsMat <- read.table("tpm_matrix.txt")
+pdMat <- new("AnnotatedDataFrame", read.table("pd_matrix.txt"))
+fdMat <- new("AnnotatedDataFrame", read.table("fd_matrix.txt"))
+sc <- newCellDataSet(as.matrix(exprsMat), phenoData = pdMat, featureData = fdMat)
+```
+
+* `newCellDataSet()` = creates a new `CellDataSet` object. Requires the `phenoData` and `featureData` object to be an `AnnotatedDataFrame`. 
+
+# Extracting Data
+
+Uses `CellDataSet` object
+
+* `detectGenes(object, min_expr = 0.1)` = extracts how many cells express a given gene or how many genes are expressed in a given cell
+
+#### Extracting genes expressed in at least 50 cells
+
+```{r}
+sc <- detectGenes(sc, min_expr = 0.1)
+print(head(fData(sc)))
+expressed_genes <- row.names(subset(fData(sc), num_cells_expressed >= 50)) # keep this for later on
+```
+
+
+# Quality Control and Diagnostics
+
+#### Experimental filtering metrics
+
+Single-cell RNA-Seq protocol may have imaged cells after capture, but prior to lysis. It is important to remove (1) libraries that did not come from a single cell, (2) libraries that were made from empty wells or (2) wells with excess cell debris. These are all problematic for monocle. This can all be stored in the `phenoData` table and filtered. 
+
+#### Sequencing filtering metrics
+
+Using `fastqc`, identify and remove libraries that are heavily degraded, libraries with a large amount of ribosomal, mitochondirla or other RNA type. Also, remove cells with only a few thousand reads.  
+
+
+#### Check if gene expression is log-normally distributed
+
+After filtering the libraries, verify the expression values are log-normally distributed
+```{r}
+L <- log(exprs(sc[expressed_genes,]))
+melted_dens_df <- melt(t(scale(t(L))))
+qplot(value, geom="density", data=melted_dens_df) + 
+    stat_function(fun = dnorm, size=0.5, color='red') + 
+    xlab("Standardized log(FPKM)") + ylab("Density")
+```
+
+#### Plots
+Create plots of gene expression grouped by factors (only for a small number of genes). Plots can be created using either a `groupFactor` phenotypic factor for each cell or a `Time` variable. 
+
+Example: 
+```{r}
+plot_genes_jitter(sc[1:2,], grouping = "groupFactor", ncol = 2)
+plot_spanning_tree(sc) # plots the order of the cells using PC1 and PC2. 
+plot_genes_in_pseudotime(sc_subset, color_by = "Time") 
+```
+
+* `plot_genes_jitter(object, grouping = "groupFactor", ncol = 2)` = Create plots of gene expression grouped by factors (only for a small number of genes). Based on the `CellDataSet` object. 
+* `plot_spanning_tree(object)` = Plots the minimum spanning tree on cells after applying the `orderCells()` function. 
+* `plot_genes_in_pseudotime()` = Plots expression for one or more genes as a function of pseudotime. 
+
+
+# Finding differentially expressed genes
+
+**Purpose**: Use normalized data to identify differentially expressed (DE) genes across single cell libraries correlated with the phenotype of interest (`groupFactor`, seperate from the `Time` variable). Must specify the structure of the model using the `fullModelFormulaStr` parameter. 
+
+Example: 
+```{r}
+fit <- differentialGeneTest(sc, fullModelFormulaStr = "expression ~ groupFactor")
+sig_genes <- subset(fit, qval < 0.1) # Select genes that are significant at an FDR < 10%
+sig_genes <- merge(fData(sc), sig_genes, by="row.names") # Attach the HUGO symbols and other featureData for these genes
+```
+
+Can perform DE with mutiple factors using `reducedModelFormulaStr` argument.
+Example: 
+```{r}
+fit <- differentialGeneTest(sc, fullModelFormulaStr = "expression ~ Time * groupFactor", 
+                            reducedModelFormulaStr = "expression ~ Time")
+```
+
+
+# Ordering cells
+
+**Purpose**: Order the cells in how far they have progressed through a process of interest. Monocle can identify where cells diverge and groups of cells that have progressed down a similar path. (**Note**: This depends on having a pre-defined set of biologically relevant genes.)
+
+Example: 
+```{r}
+fit <- differentialGeneTest(sc, fullModelFormulaStr = "expression ~ groupFactor")
+orderedGenes <- row.namess(subset(fit, qval < 0.1)) # will return a long list of genes
+orderedGenes <- intersect(orderedGenes, expressed_genes) # subset for genes expressed in a large number of cells
+sc <- setOrderingFilter(sc, orderedGenes) # sets the list of gene ids used for ordering in object
+sc <- reduceDimension(sc, use_irlba=FALSE) # reduce the dimension to 1-2 dims using ICA
+sc <- orderCells(sc, num_paths = 2, reverse = TRUE) # orders cells 
+```
+
+* `reduceDimension(object, max_components = 2, use_irlba = TRUE, batch = NULL, covariates = NULL)` = computes a projection of gene expression using the biologically relevant genes (e.g. could be 500 genes) into a lower dimensional space. Can provided `batch` and `covariates` which will use `removeBatchEffect()` in `limma` to remove batch effects in the expression data prior to clustering or unsupervised learning (e.g. PCA, MDS, heatmaps). `use_irlba` is a logic argument to determine whether to use the IRLBA package for ICA reduction. 
+* `orderCells(object, num_paths = 2, reverse = TRUE, root_cell = NULl)` = orders the cells. The `num_paths` argument allows cells to be assigned to multiple alternative fates. e.g. if you know you have a set of contaminat cells, set `num_paths`= 2 (contaminant cells have their own trajectory. The `reverse` argument tells Monocle to reverse the orientation of the entire process as it is being learned from the data, so that the cells that would have been assigned to the end are instead assigned to the beginning. The `root_cell` argument is the name of the cell to use at the root of the ordering tree. 
+
+

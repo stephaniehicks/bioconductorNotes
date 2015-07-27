@@ -1,0 +1,167 @@
+---
+title: "sincell"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+opts_chunk$set(eval=FALSE)
+```
+
+**Purpose**: Cell-state similarity and hierarchy for single-cell RNA-Seq data. 
+This R/Bioconductor package (1) asseses cell-to-cell distance and (2) build a 
+cell-state hierarchy. Assessments of the robustness of the cell-state hierarchy
+are also provided.
+
+**Citations**: 
+
+* [Julia et al. (2015)](http://www.ncbi.nlm.nih.gov/pubmed/26099264) - for information on the core algorithm in sincell
+
+To install the sincell R/Bioconductor package
+```{r}
+source("http://bioconductor.org/biocLite.R")
+biocLite("sincell")
+library(sincell)
+```
+
+# Pre-process outside of sincell
+
+Before using sincell, the gene expression values must be pre-processed.
+
+#### quality control and normalization
+sincell assumes individual cells have been removed based on quality 
+control metrics and that gene expression has been already normalized for 
+library size, sequencing depth, or other sources of technical variability. 
+
+#### Experimental filtering metrics
+
+Single-cell RNA-Seq protocol may have imaged cells after capture, but prior to lysis. It is important to remove (1) libraries that did not come from a single cell, (2) libraries that were made from empty wells or (2) wells with excess cell debris. These are all problematic for sincell. This can all be stored in the `phenoData` table and filtered. 
+
+#### Sequencing filtering metrics
+
+Using `fastqc`, identify and remove libraries that are heavily degraded, libraries with a large amount of ribosomal, mitochondirla or other RNA type. Also, remove cells with only a few thousand reads.  
+
+
+#### variance stabilization
+The [sincell Bioconductor tutorial](http://bioconductor.org/packages/release/bioc/vignettes/sincell/inst/doc/sincell-vignette.pdf) warns the use that some functions are computational intensive. 
+Authors suggest to identify *the most variable protein coding genes* because
+the genes *drive most of the signal to assess cell-state hierarchies and restricting the analyses to them should not bias the final results*. This depends on the mean-variance relationship of
+the genes across cells (the variance of mean expression depends on the mean). 
+The authors also suggest transforming the normalized 
+expression data using a log transformation. 
+
+Authors refer to two tutorials to help identify the most variable genes: 
+
+1. http://pklab.med.harvard.edu/scw2014/subpop_tutorial.html
+2. http://master.bioconductor.org/help/workflows/rnaseqGene/#de
+
+Authors use `detectGenes()` and `differentialGeneTest` from 
+[monocle](https://github.com/stephaniehicks/bioconductorNotes/blob/master/monocle.Rmd)
+to subset for genes with a minimum number of cells expression that gene and to 
+identify genes that are differential expressed with a given false discovery rate. 
+Finally, the authors log transform the expression data. 
+
+Next, author use the R/Bioconductor `biomaRt` package to identify 
+protein-coding genes. 
+
+
+# Data Classes in sincell
+Use `sc_InitializingSincellObject()` to initialize a sincell object: 
+
+* The class struction in sincell is a `List` with one element, namely 
+(`expressionmatrix`). This holds the pre-processed expression values. 
+* No phenotypic information is needed initialize a sincell object.
+
+Example: 
+```{r}
+exprsMat <- read.table("processed_expression_matrix.txt")
+scMat <- sc_InitializingSincellObject(exprsMat)
+```
+
+
+# cell-to-cell distance
+
+**Purpose**: Use normalized expression data to compute a cell-to-cell 
+distance matrix.
+
+Example:
+```{r}
+# directly compute cell-to-cell distance
+scMat <- sc_distanceObj(scMat, method = "euclidean")
+
+# data reduction and then compute cell-to-cell distance
+scMat <- sc_DimensionalityReductionObj(scMat, method="PCA", dim=3)
+scMatPCA <- sc_InitializingSincellObject(scMat[["cellsLowDimensionalSpace"]])
+scMat <- sc_distanceObj(scMatPCA, method = "euclidean")
+```
+
+* `sc_distanceObj(scMat, method)` = computes a cell-to-cell distance matrix directly 
+with a specified metric of distance. Options include euclidean 
+distance (`euclidean`), Pearson correlation (`pearson`), Spearman 
+correlation (`spearman`), L1 distance (`L1`), Cosine distance (`cosine`) 
+and Mutual Information (`MI`). This function added a new element to the list
+title `cell2celldist`. 
+* `sc_DimensionalityReduction(scMat, method, dim)` = reduces the data 
+dimension first and then can compute the cell-to-cell distance using 
+`sc_distanceObj()`. Options for data dimension reduction include 
+Principal Component Analysis (`PCA`), Independent Component Analysis (`ICA`), 
+t-Distributed Stochastic Neighbor Embedding (`tSNE`), classical Multidimensional
+Scaling (`classical-MDS`) and non-metric Multidimensional Scaling (`nonmetric-MDS`).
+
+
+# cell-state hierarchy
+
+**Purpose**: Use cell-to-cell distance matrix to determine cell-state hierarchy 
+by applying a graph-building algorithm. 
+
+Example: 
+```{r}
+# optional: cluster cells based on k-NN where k=3
+scMat <- sc_clusterObj(scMat, clust.method="knn", mutual=FALSE, k=3)
+scMat_kNN_Clustered <-scMat[["cellsClustering"]]
+
+# graph-building algorithm
+scMat <- sc_GraphBuilderObj(scMat, graph.algorithm="MST",
+        graph.using.cells.clustering=FALSE) 
+scMat_MST_Hierarchy <- scMat[["cellstateHierarchy"]]
+```
+
+* `sc_clusterObj(scMat, clust.method, max.distance)` = optionally clusters 
+the cells to identify groups of cells. This creates a `cellsClustering` 
+element in the list. Methods to cluster include:
+    * a maximum pair-wise distance cut-off keeping pairs of cells connected by a distance lower than a threshold (`clust.method = max.distance` and `max.distance = 0.5`).  
+    * a rank-percentile of shortest pair-wise differences keeping only the shortest 10% of all pairwise differences, (`clust.method="percent"`, and `shortest.rank.percent=10`). 
+    * k-nearest neighbors (`clust.method="knn"`, `mutual=FALSE`, `k=3`). Authors recommend this option. 
+    * k-mutual nearest neighbors (`clust.method="knn"`, `mutual=TRUE`, `k=3`). Only k reciprocal nearest neighbors are clustered together. 
+    * k-medoids (`clust.method="k-medoids"`, `mutual=TRUE`, `k=3`)
+    * agglomerative clustering (based on `hclust()`) (`clust.method="complete"`, `mutual=TRUE`, `k=3`)
+* `sc_GraphBuilderObj()` = applies a graph-building algorithm from a 
+cell-to-cell distance matrix. This creates a `cellstateHierarchy` 
+element in the list.  Options include: 
+    * Minimum Spanning Tree (`graph.algorithm=MST`, `graph.using.cells.clustering=FALSE`)
+    * Maximum Similarity Spanning Tree (`graph.algorithm="SST"`, `graph.using.cells.clustering=FALSE`)
+    * Iterative Mutual Clustering Graph (`graph.algorithm="IMC"`)
+    * optionally, clusters of cells can be used to overlay connections between pairs of cells belonging to the same cluster (using `graph.using.cells.clustering=TRUE`)
+* `sc_ComparissonOfGraphs(obj1, obj2, ..., graph.names)` = compare the graphs from applying different methods. distance between two graphs is defined as *1 - Spearman rank correlation between two graphs of the shortest distance for all pairs of cells*. The `graph.names` parameter is a character string of the methods being compared. 
+
+# Graphical representation of cell-state hierarchies
+
+**Purpose**: Create graphical representations based on the R package `igraph`
+using the `plot.igraph()` function. 
+
+Example: 
+```{r}
+plot.igraph(scMat_MST_Hierarchy)
+```
+
+# Assessing cell heterogeneity in cell-state hierarchy
+
+**Purpose**: Functions to assess the cell heterogeneity/homogeneity in the 
+cell-state hierarchy. If there is low cell-to-cell heterogeneity, then cell-state 
+hierarchies will be very sensitive to initial gene expression data. If there is
+high cell-to-cell heterogeneity (*driven by a real granularity in an activation/differentiation process* ), then cell-state hierarchy will be robust to initial gene expression data. This helps 
+to find reliable cell-state hierarchies. 
+
+* `sc_StatisticalSupportByGeneSubsampling(scMat, num_it)` = method based on gene resampling. The `num_it` parameter determines the number of resamples. Returns the distribution of Spearman rank correlations between original cell-state hierarchy and resampled hierarchies.  
+* `sc_InSilicoCellsReplicatesObj(scMat, method, multipler)` = method based on random cell substitution with in silico-generated cell replicates. 
+
+

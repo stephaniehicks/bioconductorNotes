@@ -8,7 +8,7 @@ opts_chunk$set(eval=FALSE)
 ```
 
 **Purpose**: Cell-state similarity and hierarchy for single-cell RNA-Seq data. 
-This R/Bioconductor package (1) asseses cell-to-cell distance and (2) build a 
+This R/Bioconductor package (1) asseses cell-to-cell distance and (2) builds a 
 cell-state hierarchy. Assessments of the robustness of the cell-state hierarchy
 are also provided.
 
@@ -29,17 +29,12 @@ Before using sincell, the gene expression values must be pre-processed.
 
 #### quality control and normalization
 sincell assumes individual cells have been removed based on quality 
-control metrics and that gene expression has been already normalized for 
-library size, sequencing depth, or other sources of technical variability. 
-
-#### Experimental filtering metrics
-
-Single-cell RNA-Seq protocol may have imaged cells after capture, but prior to lysis. It is important to remove (1) libraries that did not come from a single cell, (2) libraries that were made from empty wells or (2) wells with excess cell debris. These are all problematic for sincell. This can all be stored in the `phenoData` table and filtered. 
-
-#### Sequencing filtering metrics
-
-Using `fastqc`, identify and remove libraries that are heavily degraded, libraries with a large amount of ribosomal, mitochondirla or other RNA type. Also, remove cells with only a few thousand reads.  
-
+control metrics. For example, use `fastqc`, identify and remove libraries that 
+are heavily degraded, libraries with a large amount of ribosomal, 
+mitochondirla or other RNA type. Also, remove cells with only a few 
+thousand reads. Also, sincell assumes gene expression has been already 
+normalized for library size, sequencing depth, or other sources of 
+technical variability. 
 
 #### variance stabilization
 The [sincell Bioconductor tutorial](http://bioconductor.org/packages/release/bioc/vignettes/sincell/inst/doc/sincell-vignette.pdf) warns the use that some functions are computational intensive. 
@@ -68,7 +63,8 @@ protein-coding genes.
 Use `sc_InitializingSincellObject()` to initialize a sincell object: 
 
 * The class struction in sincell is a `List` with one element, namely 
-(`expressionmatrix`). This holds the pre-processed expression values. 
+(`expressionmatrix`). This holds the pre-processed expression values. As 
+functions are applied to this object, new elements in the list will be created.
 * No phenotypic information is needed initialize a sincell object.
 
 Example: 
@@ -101,7 +97,7 @@ correlation (`spearman`), L1 distance (`L1`), Cosine distance (`cosine`)
 and Mutual Information (`MI`). This function added a new element to the list
 title `cell2celldist`. 
 * `sc_DimensionalityReduction(scMat, method, dim)` = reduces the data 
-dimension first and then can compute the cell-to-cell distance using 
+dimension first and then the user can compute the cell-to-cell distance using 
 `sc_distanceObj()`. Options for data dimension reduction include 
 Principal Component Analysis (`PCA`), Independent Component Analysis (`ICA`), 
 t-Distributed Stochastic Neighbor Embedding (`tSNE`), classical Multidimensional

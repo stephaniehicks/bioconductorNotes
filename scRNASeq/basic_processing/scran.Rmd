@@ -1,0 +1,228 @@
+---
+title: "scran"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+opts_chunk$set(eval=FALSE)
+```
+
+**Purpose**: Basic analyses for single-cell RNA-Seq data. 
+This R/Bioconductor package (1) assigns cells to cell cycle phases,
+(2) detects highly variable and correlated genes across cells 
+
+and (2) . 
+
+**Citations**: 
+
+* N/A
+
+To install the 
+[scran R/Bioconductor](http://bioconductor.org/packages/devel/bioc/html/scran.html)
+package
+```{r}
+source("http://bioconductor.org/biocLite.R")
+biocLite("scran")
+library(scran)
+```
+
+# Pre-process outside of scran
+
+Before using scran, the gene expression values must be pre-processed.
+
+#### quality control 
+scran assumes individual cells have been removed based on quality 
+control metrics. For example, use `fastqc`, identify and remove libraries that 
+are heavily degraded, libraries with a large amount of ribosomal, 
+mitochondirla or other RNA type. Also, remove cells with only a few 
+thousand reads. scran also assumes low-abundance genes have been removed. 
+
+The [scran tutorial](http://bioconductor.org/packages/devel/bioc/vignettes/scran/inst/doc/scran.html) 
+suggests the user tries the R/Biocondutor packages [scater](http://bioconductor.org/packages/devel/bioc/html/scater.html) and 
+[cellity](http://bioconductor.org/packages/devel/bioc/html/cellity.html)
+for more details. 
+
+
+# Data Classes in scran
+Use `newSCESet()` to initialize a scran object: 
+
+* No phenotypic information is needed initialize a scran object
+* Use the `isSpike()` function to define which correspond to spike-in 
+transcripts
+
+Example: 
+```{r}
+exprsMat <- read.table("processed_expression_matrix.txt")
+scMat <- newSCESet(countData = data.frame(exprsMat))
+isSpike(scMat) <- rep(c(FALSE, TRUE), c(1e4, 30))
+```
+
+# Pre-process inside of scran
+
+scran **does not** assumes the gene expression has been already 
+normalized for library size (size factors), sequencing depth, or 
+other sources of technical variability. They provide functions to do this.  
+
+#### Normalize by library size
+
+The function `computeSumFactors()` calculates size factors to scale counts
+in each cell. The authors make the **assumption** that most genes are 
+DE between cells, such that any differences in expression across 
+the majority of genes represents some technical bias that should be removed.
+
+```{r}
+scMat <- computeSumFactors(scMat)
+summary(sizeFactors(scMat))
+```
+
+#### Normalize by library size using clusters of similar cells
+
+The `quickCluster()` function can be applied **before normalization**
+to identify clusters of cells with similar expression. Normalization is
+then applied **within each cluster** to compute size factors. Size factors
+are then rescaled by normalization between clusters. Authors state, 
+"this reduces the risk of violating the above assumption when many 
+genes are DE across a heterogeneous population."
+
+```{r}
+scMat <- newSCESet(countData = data.frame(exprsMat))
+cl <- quickCluster(scMat)
+scMat <- computeSumFactors(scMat, cluster = cl)
+```
+
+#### Normalize based on spike-ins
+
+Use the spike-in RNA added to each cell before library prepartion for 
+normalization. Size factors are computed to scale the counts such that
+the total coverage of the spike-in transcripts is equal across cells. 
+
+Authors state: "The **main practical difference** is that spike-in 
+normalization preserves differences in total RNA content between 
+cells, whereas `computeSumFactors()` and other non-DE methods do not."
+
+```{r}
+scMat2 <- computeSpikeFactors(scMat)
+summary(sizeFactors(scMat2))
+```
+
+
+# Classify cells in cell-cycle phases
+
+**Purpose**: Use normalized expression data to classify cells in
+phases of the cell cycle (G1, S, G2M). 
+
+A pre-defined classifer was constructed for human and mouse 
+data (included in package) based on training data. Pairs of genes
+were identified where the difference in expression **within**
+each pair changed sign across phases. Checking the sign of the
+difference in the test data will classify cells in the phases. 
+Other classifiers can be constructed using the `sandbag()` function. 
+The classification is done with the `cyclone()` function. 
+
+
+Example:
+```{r}
+# load pre-defined classifier (mouse)
+mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
+
+# create new scran object and normalize size factors
+scMat <- newSCESet(countData = data.frame(exprsMat))
+scMat <- computeSumFactors(scMat)
+
+# classification of cells in to cell cycle phase
+assigned <- cyclone(scMat, mm.pairs)
+head(assigned$scores)
+```
+
+* `cyclone(scMat, predefinedClassifier)`
+
+
+
+# Detecting highly variable genes
+
+**Purpose**: Detect highly variable genes by decomposing 
+total variance of each gene into biological and technical 
+components. 
+
+A mean-variance trend is fit to the normalized log-transformed 
+expression values with `trendvar()`. Default is to use spike-in
+transcripts (only should have technical noise). 
+
+Once the fitted values are obtained, they are subtracted from the 
+total variance to obtain the biologial component for each gene
+using the `decomposeVar()`. Highly variable genes are 
+defined as the genes with the **largest** biological components. 
+
+Example: 
+```{r}
+# create new scran object and normalize size factors using spike-ins
+scMat <- newSCESet(countData = data.frame(exprsMat))
+isSpike(scMat) <- rep(c(FALSE, TRUE), c(1e4, 30))
+scMat2 <- computeSpikeFactors(scMat)
+
+# fit a mean-variance trend
+fit <- trendvar(scMat2)
+
+# subtract technical noise from total variance
+decomp <- decomposeVar(scMat2, fit)
+top.hvgs <- order(decomp$bio, decreasing=TRUE)
+head(decomp[top.hvgs,])
+
+# plot mean-variance fit 
+plot(decomp$mean, decomp$total, xlab="Mean log-expression", ylab="Variance")
+o <- order(decomp$mean) # endogenous genes
+lines(decomp$mean[o], decomp$tech[o], col="red", lwd=2) # mean-var trend
+points(fit$mean, fit$var, col="red", pch=16) # spike-in transcripts
+```
+
+
+* If **spike-ins are absent**, use the argument `use.spikes=FALSE` 
+in `trendVar()`. 
+* If there are **batch effects**, use the `design` argument
+to provide a design matrix to incoporate this information using 
+`model.matrix()` in `trendVar()`. 
+
+
+# Detecting correlated genes
+
+**Purpose**: Detect correlated genes using the top set of 
+highly variable genes. The idea is to separate highly variable 
+genes that are caused random noise vs highly variable genes
+that drive the heterogeneity between groups of cells. 
+
+Example: 
+```{r}
+null.dist <- correlateNull(ncol(scMat))
+cor.pairs <- correlatePairs(scMat[top.hvgs[1:200],], null.dist=null.dist)
+head(cor.pairs)
+```
+
+* `correlatedPairs(scMat, null.dist)` = correlation is computed using
+modified Spearman's rho. Significance testing is done by first 
+constructing a null distribution. Use the `design`
+argument to include batch effect information. 
+* `correlateNull()` = construct a null distribution. Use the `design`
+argument to include batch effect information. 
+
+Author's state: "Significant correlations between pairs of genes 
+can be defined at a false discovery rate (FDR) threshold of, 
+e.g., 5%. In this case, no correlations are significant as the 
+counts were randomly generated for each gene. In other situations 
+when correlated gene pairs are present, these can be used to 
+construct heatmaps to verify whether subpopulations exist; 
+for choosing marker genes in experimental validation; and 
+to construct gene-gene association networks."
+
+# Other formats
+
+**Purpose**: Function to convert from scran object 
+to edgeR, DESeq2 or monocle object. 
+
+```{r}
+y <- convertTo(scMat, type="edgeR")
+```
+
+* `convertTo(scMat, type="edgeR")` = Function to convert from 
+scran object to other objects including edgeR (`DEGList`), 
+DESeq2 (`DESeqDataSet`), monocle (`CellDataSet`). 
+

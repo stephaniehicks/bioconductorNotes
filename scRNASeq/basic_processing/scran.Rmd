@@ -8,14 +8,14 @@ opts_chunk$set(eval=FALSE)
 ```
 
 **Purpose**: Basic analyses for single-cell RNA-Seq data. 
-This R/Bioconductor package (1) assigns cells to cell cycle phases,
-(2) detects highly variable and correlated genes across cells 
-
-and (2) . 
+This R/Bioconductor package (1) estimates pool-based and spike-in based 
+normalization size factors, (2) assigns cells to cell cycle phases,
+(3) detects highly variable and correlated genes across cells. 
 
 **Citations**: 
 
-* N/A
+* For more details on estimating pool-based size factors which is 
+implemented in `computeSumFactors()`, see [Lun et al. (2016). Pooling across cells to normalize single-cell RNA sequencing data with many zero counts. Genome Biology](http://genomebiology.biomedcentral.com/articles/10.1186/s13059-016-0947-7). 
 
 To install the 
 [scran R/Bioconductor](http://bioconductor.org/packages/devel/bioc/html/scran.html)

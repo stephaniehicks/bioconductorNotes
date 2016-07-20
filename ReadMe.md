@@ -8,7 +8,7 @@ This is Github repo containing notes / usage examples for various R/Bioconductor
 
 #### Analysis of single cell RNA-Seq data
 
-[See scRNASeq folder](https://github.com/stephaniehicks/bioconductorNotes/scRNASeq)
+[See scRNASeq folder](https://github.com/stephaniehicks/bioconductorNotes/tree/master/scRNASeq)
 
 
 ## Analysis of DNA methylation data

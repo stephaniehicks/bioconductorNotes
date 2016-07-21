@@ -1,0 +1,216 @@
+---
+title: "scater"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+opts_chunk$set(eval=FALSE)
+```
+
+**Purpose**: Basic analyses for single-cell RNA-Seq data. 
+This R/Bioconductor package includes (1) QC metrics, 
+(2) transcript quantification, (3) data visualization.
+
+![scater Overview](https://raw.githubusercontent.com/davismcc/scater/master/inst/scater_qc_workflow.png)
+
+**Citations**:  
+
+* N/A
+
+**Workflows**:
+
+* [Analysis of single-cell RNA-seq data](http://hemberg-lab.github.io/scRNA.seq.course/index.html)
+
+To install the 
+[scater R/Bioconductor](http://bioconductor.org/packages/devel/bioc/html/scater.html)
+package
+```{r}
+source("http://bioconductor.org/biocLite.R")
+biocLite("scater")
+library(scater)
+```
+
+
+# Pre-process outside of scater
+
+Before using scater, the gene expression values must be pre-processed.
+
+#### quality control 
+scater assumes individual cells have been removed based on quality 
+control metrics. For example, use `fastqc`, identify and remove libraries that 
+are heavily degraded, libraries with a large amount of ribosomal, 
+mitochondirla or other RNA type. Also, remove cells with only a few 
+thousand reads. scran also assumes low-abundance genes have been removed. 
+
+
+# Data Classes in scater
+
+* `SCESet` = This class holds the expression values. Class structure is derived from the `ExpressionSet` class in Biocoductor. To create a `SCESet` object, use `newSCESet()` and provided three data sets: 
+     * `countData` = numeric matrix of counts (rows = genes, columns = cells). In this case, the `exprs` slot in the object will be generated as `log2(counts-per-million)` using the `cpm()` function from `edgeR`, with a "prior count" value of 1.
+     * `phenoData` = An `AnnotatedDataFrame` describing phenotypic information for each cell (group, batch, etc)
+     * `featureData` = An `AnnotatedDataFrame` describing gene-level information for each gene (e.g. gc content, ensemble gene name, etc)
+    
+You can also provide the normalized expression values without needing to provide the count data
+   * `exprsData` = numeric matrix of expression values (rows = genes, columns = cells). The `scater` vignette states: "Typically these should be `log2(counts-per-million)` values or `log2(reads-per-kilobase-per-million-mapped)`, appropriately normalised of course. The package will generally assume that these are the values to use for expression." You can add the count data afterwards using the `counts(object)` function. 
+
+
+# Reading in Data
+
+* `newSCESet()`: creates a new `SCESet` object. Requires the `phenoData` and `featureData` object to be an `AnnotatedDataFrame`. 
+
+Example: 
+```{r}
+library(scRNASeqHumanPatelGlioblastoma)
+data("glioHumanTPM")
+scMat <- newSCESet(glioHumanTPM)
+
+countsMat <- read.table("counts_matrix.txt")
+pdMat <- new("AnnotatedDataFrame", read.table("pd_matrix.txt"))
+fdMat <- new("AnnotatedDataFrame", read.table("fd_matrix.txt"))
+scMat <- newSCESet(countData = as.matrix(countsMat), phenoData = pdMat, featureData = fdMat)
+
+# to add a different expression matrix e.g. 
+exprs(scMat) <- edgeR::cpm.default(counts(scMat), prior.count = 5, log = TRUE)
+
+# or can create a new SCESet object with only expression data 
+#   Note: no count data, phenoData or featureData needed, though not recommended.
+scMat2 <- newSCESet(exprsData = edgeR::cpm.default(scMat, prior.count = 5, log = TRUE))
+```
+
+
+# Quality Control and Diagnostics
+
+Uses the `SCESet` object:
+
+* `is_exprs(object)`: returns a logical matrix indicating whether each feature expression observation is above the defined `lowerDetectionLimit` (default is 0). This can be determined on the count scale or the "expression" (i.e. `exprs(object)`) scale.
+* `calcIsExprs(object, lowerDetectionLimit = 100)`: varies the detection limit threshold
+* `counts(object)`: returns feature counts
+* `calculateQCMeterics(object, feature_controls = 1:40)`: calculates quality control metrics. Can define feature and cell controls. 
+* `scater_gui(object)`: opens an interactive dashboard to play around with data using a graphical user interface (GUI)
+
+#### Create logical matrix of which features are being expressed
+
+```{r}
+is_exprs(scMat) <- calcIsExprs(scMat, lowerDetectionLimit = 5, 
+                               exprs_data = "exprs")
+# filter out genes that are not expressed with a lowerDectionLimit of 5
+keep_genes <- rowSums(is_exprs(scMat)) > 5
+scMat <- scMat[keep_genes, ]
+```
+
+## Quality control metrics
+
+The authors state: "Following QC, we can proceed with data 
+normalisation before downstream analysis and modelling." 
+
+Authors split the QC metrics/plots into three steps: 
+
+1. QC and filtering of features (genes)
+2. QC and filtering of cells
+3. QC of experimental variables
+
+Many of the functions in the QC are plots to explore and identify
+problems (e.g. features or cells that need to be removed). The 
+function `calculateQCMetrics()` is used to compute 
+commonly used QC metrics. Controls (features or cells) can 
+be defined. 
+
+```{r}
+scMat <- calculateQCMetrics(scMat, feature_controls = 1:20)
+varLabels(scMat)
+```
+
+
+#### QC and filtering features
+
+The `calculateQCMetrics()` function adds the following columns to `pData(object)`:
+
+Cell-level QC metric | Description 
+--- | ---
+`total_counts` | total number of counts for the cell (aka 'library size')
+`log10_total_counts` | total_counts on the `log10`-scale
+`total_features` | the number of features for the cell that have expression above the detection limit (default detection limit is zero)
+`filter_on_total_counts` | would this cell be filtered out based on its `log10-total_counts` being (by default) more than 5 median absolute deviations from the median `log10-total_counts` for the dataset?
+`filter_on_total_features` | would this cell be filtered out based on its `total_features` being (by default) more than 5 median absolute deviations from the median `total_features` for the dataset?
+`counts_feature_controls` | total number of counts for the cell that come from (a set of user-defined) control features. Defaults to zero if no control features are indicated.
+`counts_endogenous_features` | total number of counts for the cell that come from endogenous features (i.e. not control features). Defaults to `total_counts` if no control features are indicated.
+`log10_counts_feature_controls` | total number of counts from control features on the `log10`-scale. Defaults to zero (i.e. `log10(0 + 1)`, offset to avoid infinite values) if no control features are indicated.
+`log10_counts_endogenous_features` | total number of counts from endogenous features on the `log10`-scale. Defaults to zero (i.e. `log10(0 + 1)`, offset to avoid infinite values) if no control features are indicated.
+`n_detected_feature_controls` | number of defined feature controls that have expression greater than the threshold defined in the object. 
+`pct_counts_feature_controls` | percentage of all counts that come from the defined control features. Defaults to zero if no control features are defined.
+
+* Multiple sets of feature controls can be defined
+* Where `counts` appear above, similar metrics can be computed for `exprs`, `tpm` and `fpkm`
+
+
+
+#### QC and filtering cells
+
+The `calculateQCMetrics()` function adds the following columns to `fData(object)`:
+
+Feature-level QC metric | Description 
+--- | ---
+`mean_exprs` | the mean expression level of the gene/feature.
+`exprs_rank` | the rank of the feature's expression level in the cell.
+`total_feature_counts` | the total number of counts mapped to that feature across all cells.
+`log10_total_feature_counts` | total feature counts on the `log10`-scale.
+`pct_total_counts` | the percentage of all counts that are accounted for by the counts mapping to the feature.
+`is_feature_control` | is the feature a control feature? Default is `FALSE` unless control features are defined by the user.
+`n_cells_exprs` | the number of cells for which the expression level of the feature is above the detection limit (default detection limit is zero).
+
+
+```{r}
+
+```
+
+
+#### QC of experimental variables
+
+TBA
+
+# Many plot functions available for `SCESet` object
+
+**Many** plotting functions are available for visualising the data. Many of 
+the plots create can facet or group the gene expression by factors. 
+
+* `plot(object, block1 = "groupFactor1", block2 = "groupFactor2", nfeatures = 500, exprs_values = "counts")`: gives an overview of expression across cells 
+    * uses TPM as default (or will use `exprs(object)`). Other values can be specified with `exprs_values` argument
+    * `block1` and `block2` are optional arguments that can create a faceted set of plots separated by `groupFactor` phenotypic factor information in `phenoData` (e.g. batch). Allows user to see large differences in distributions of expression across experimental blocks, batches, etc. 
+    * plots cumulative proportion of each cell's library that is accounted for by the highest-expressed features (default showing top 500 features); shows differences in expression distributions across cells (similar idea to boxplots)
+* `plotExpression(object, rownames(scMat)[1:6], x = "groupFactor1", showMedian = FALSE, show_violin = TRUE)`: plot expression levels for a defined set of features
+    * the optional `x` argument splits each feature based on some phenotypic information (e.g. batch)
+* `plotQC(object, type = "highest-expression", exprs_values = "tpm")`: various methods are available for producing QC diagnostic plots
+    * `type = "highest-expression"`: plot the most expressed features across the dataset. Default shows top 50 features.
+    * `type = "exprs-freq-vs-mean"`: plot frequency of expression (number of cells with expression for a gene above the defined threshold) vs mean expression level. Gives an didea of technical noise in dataset. 
+    * Find the most important PCs for a given cell phenotype or metadata variable (from `pData(object)`)
+    * Plot a set of cell phenotype/metadata variables against each other and calculating the (marginal) percentage of feature expression variance that they explain
+    * Note: Vignette states you can use `multiplot` function to plot multiple `ggplot2` plots on the same page. 
+* `plotFeatureData(object, aes(x = n_cells_exprs, y = pct_total_counts))`: plot **feature** metadata and QC metrics. Can identify problematic cells by exploring relationship bewteen QC metrics computed from `calculateQCMetrics()`. Output is a `ggplot2` object.
+* `plotPhenoData(object, aes(x = total_counts, y = total_features, colour = groupFactor1))`: plot **cell** metadata and QC metrics. Output is a `ggplot2` object.
+* `plotPCA(object, ntop=500, exprs_values="exprs")`: produce a principal components plot for visualizing the cells. PCs calculated using 500 features with **most variable expression across all cells** (can be changed with `ntop` argument) from the `exprs` slot (but can be changed e.g. `exprs_values="cpm"`). 
+    * `feature_set = fData(object)$is_feature_control`: if control features are defined, you can use only these to calculate PCs. 
+    * `ncomponents = 4, colour_by = "Treatment", shape_by = "Mutation_Status"`: allows more than 2 PCs to be plotted and allows phenotypic information to be defined using colour, shapes, size etc. 
+    * `object <- plotPCA(object)`: the `SCESet` object has a `reducedDimension` slot which stores the top PCs. This can be accessed using the `reducedDimension()` function (e.g. `reducedDimension(object)`).
+* `plotTSNE(object, colour_by = "Gene_0001", size_by = "Gene_1000")`: produce a *t*-distributed stochastic neighbour embedding (reduced dimension) plot for the cells
+* `plotDiffusionMap(object, colour_by = "Gene_0001", size_by = "Gene_1000")`: produce a diffusion map (reduced dimension) plot for the cells
+* `plotMDS(object)`: produce a multi-dimensional scaling plot for the cells
+* `plotReducedDim(object)`: plot a reduced-dimension representation of the cells
+
+
+
+#### Plots
+
+Example: 
+```{r}
+plot_genes_jitter(sc[1:2,], grouping = "groupFactor", ncol = 2)
+plot_spanning_tree(sc) # plots the order of the cells using PC1 and PC2. 
+plot_genes_in_pseudotime(sc_subset, color_by = "Time") 
+```
+
+* `plot_genes_jitter(object, grouping = "groupFactor", ncol = 2)` = Create plots of gene expression grouped by factors (only for a small number of genes). Based on the `CellDataSet` object. 
+* `plot_spanning_tree(object)` = Plots the minimum spanning tree on cells after applying the `orderCells()` function. 
+* `plot_genes_in_pseudotime()` = Plots expression for one or more genes as a function of pseudotime. 
+
+
+
+

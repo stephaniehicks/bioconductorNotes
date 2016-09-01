@@ -7,19 +7,29 @@ output: html_document
 opts_chunk$set(eval=FALSE)
 ```
 
-**Purpose**: Basic analyses for single-cell RNA-Seq data. 
-This R/Bioconductor package includes (1) QC metrics, 
-(2) transcript quantification, (3) data visualization.
+**Purpose**: Quantification, EDA and normalization for single-cell RNA-Seq data. 
+
+* Designed to go from raw reads to processed, tidy dataset for downstream analyses using other Bioconductor packages (e.g. `Rtsne` for dim reduction, `edgeR` and `limma` for differential expression, `ggplot2` for plotting, etc). 
+* Compatible with counts or other transformed expression values (e.g. TPM, FPKM, CPM, etc). 
+
+This R/Bioconductor package includes:
+
+1. A new `SCESet` (single-cell `ExpressionSet`) class in Bioconductor
+2. Wrapper functions for transcript/Gene quantification using pseudoalignments (Salmon or Kallisto)
+3. Automated calculation of QC meterics (gene-level and feature-level); filtering
+4. Data visualization to QC metrics
+5. Normalization. Methods to **identify** and **remove** uninteresting covariates
 
 ![scater Overview](https://raw.githubusercontent.com/davismcc/scater/master/inst/scater_qc_workflow.png)
 
 **Citations**:  
 
-* N/A
+* [McCarthy et al. (2016)](http://biorxiv.org/content/early/2016/08/15/069633)
+    * Presents case-studies using published and unpublished scRNA-Seq data to demonstrate package features
 
 **Workflows**:
 
-* [Analysis of single-cell RNA-seq data](http://hemberg-lab.github.io/scRNA.seq.course/index.html)
+* [Analysis of single-cell RNA-seq data (Hemberg Lab)](http://hemberg-lab.github.io/scRNA.seq.course/index.html)
 
 To install the 
 [scater R/Bioconductor](http://bioconductor.org/packages/devel/bioc/html/scater.html)
@@ -33,25 +43,33 @@ library(scater)
 
 # Pre-process outside of scater
 
-Before using scater, the gene expression values must be pre-processed.
-
 #### quality control 
-scater assumes individual cells have been removed based on quality 
-control metrics. For example, use `fastqc`, identify and remove libraries that 
+
+scater assumes **FASTQ files** of individual cells have been assessed and
+removed based on quality control metrics based on bulk RNA-Seq metrics. 
+For example, use `fastqc`, identify and remove libraries that 
 are heavily degraded, libraries with a large amount of ribosomal, 
 mitochondirla or other RNA type. Also, remove cells with only a few 
 thousand reads. scran also assumes low-abundance genes have been removed. 
 
 
-# Data Classes in scater
+# The `SCESet` Data Class in scater
 
-* `SCESet` = This class holds the expression values. Class structure is derived from the `ExpressionSet` class in Biocoductor. To create a `SCESet` object, use `newSCESet()` and provided three data sets: 
-     * `countData` = numeric matrix of counts (rows = genes, columns = cells). In this case, the `exprs` slot in the object will be generated as `log2(counts-per-million)` using the `cpm()` function from `edgeR`, with a "prior count" value of 1.
-     * `phenoData` = An `AnnotatedDataFrame` describing phenotypic information for each cell (group, batch, etc)
-     * `featureData` = An `AnnotatedDataFrame` describing gene-level information for each gene (e.g. gc content, ensemble gene name, etc)
+This class holds the expression values. Class structure is derived from the `ExpressionSet` class in Bioconductor's Biobase package. Adds additional slots to store: 
+
+1. reduced-dimension representation of data for data viz 
+2. cell-cell and gene-gene pairwise distance matrices for clustering
+3. bootstrapped expression results for quantification (e.g. from Kallisto)
+4. info about feature/cell controls for normalization, QC, detect highly variable genes, etc
+5. epigenetic info or FACS marker expression
+
+To create a `SCESet` object, use `newSCESet()` and provided three data sets: 
+    * `countData` = numeric matrix of counts (rows = genes, columns = cells). In this case, the `exprs` slot in the object will be generated as `log2(counts-per-million)` using the `cpm()` function from `edgeR`, with a "prior count" value of 1.
+    * `phenoData` = An `AnnotatedDataFrame` describing phenotypic information for each cell (group, batch, etc)
+    * `featureData` = An `AnnotatedDataFrame` describing gene-level information for each gene (e.g. gc content, ensemble gene name, etc)
     
 You can also provide the normalized expression values without needing to provide the count data
-   * `exprsData` = numeric matrix of expression values (rows = genes, columns = cells). The `scater` vignette states: "Typically these should be `log2(counts-per-million)` values or `log2(reads-per-kilobase-per-million-mapped)`, appropriately normalised of course. The package will generally assume that these are the values to use for expression." You can add the count data afterwards using the `counts(object)` function. 
+    * `exprsData` = numeric matrix of expression values (rows = genes, columns = cells). The `scater` vignette states: "Typically these should be `log2(counts-per-million)` values or `log2(reads-per-kilobase-per-million-mapped)`, appropriately normalised of course. The package will generally assume that these are the values to use for expression." You can add the count data afterwards using the `counts(object)` function. 
 
 
 # Reading in Data

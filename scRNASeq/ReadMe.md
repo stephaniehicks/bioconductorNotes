@@ -2,14 +2,13 @@
 
 This is Github repo containing notes / usage examples for analyzing single-cell RNA-Seq (scRNA-Seq) data using various R/Bioconductor packages.
 
-
 ## basic processing and normalization 
 
 * cellity [[bioC link](https://bioconductor.org/packages/release/bioc/html/cellity.html)] - classification of low quality cells in scRNA-Seq data
 * scLVM [[GitHub link](https://github.com/PMBio/scLVM)] - Dissects the observed heterogeneity into different sources, thereby allowing for the correction of confounding sources of variation. scLVM was primarily designed to account for cell-cycle induced variations in single-cell RNA-seq data where cell cycle is the primary source of variability.
 * [scater](https://github.com/stephaniehicks/bioconductorNotes/blob/master/scRNASeq/basic_processing/scater.Rmd) [[bioC link](https://www.bioconductor.org/packages/release/bioc/html/scater.html)] - This R/Bioconductor package includes (1) QC metrics, (2) transcript quantification using Kallisto, (3) many functions for data visualization.
 * SCONE [[GitHub link](https://github.com/YosefLab/scone)] - Stands for 'Single-Cell Overview of Normalized Expression'. Includes quality control metrics and normalization. 
-* [scran](https://github.com/stephaniehicks/bioconductorNotes/blob/master/scRNASeq/basic_processing/scran.Rmd) [[bioC link](http://bioconductor.org/packages/release/bioc/html/scran.html)]- Basic analyses for scRNA-Seq data. This R/Bioconductor package (1) estimates [pool-based and spike-in based normalization size factors](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-016-0947-7), (2) assigns cells to cell cycle phases, (3) detects highly variable and correlated genes across cells.
+* [scran](https://github.com/stephaniehicks/bioconductorNotes/blob/master/scRNASeq/basic_processing/scran.Rmd) [[bioC link](http://bioconductor.org/packages/release/bioc/html/scran.html)] - Basic analyses for scRNA-Seq data. This R/Bioconductor package (1) estimates [pool-based and spike-in based normalization size factors](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-016-0947-7), (2) assigns cells to cell cycle phases, (3) detects highly variable and correlated genes across cells.
 
 
 ## distance, clustering and tree structures 
@@ -46,7 +45,26 @@ See Monocle, Seurat too.
 
 ## Experimental Design
 
-* [Bacher and Kendziorski (2016)](http://genomebiology.biomedcentral.com/articles/10.1186/s13059-016-0927-y)
+* Similar to bulk RNA-Seq, it is important to randomize (or balance) design across as many factors as possible to not introduce artifacts imposed from sample preparation or data collection
+	* Potential limiting factors in experimental design that must be balanced with experimental design: 
+		* Protocols to isolate cells [see [Saliba et al. (2014)](http://www.ncbi.nlm.nih.gov/pubmed/25053837) and [Kolodziejczyk et al. (2015)](http://www.ncbi.nlm.nih.gov/pubmed/26000846)]
+		* Protocols to extract mRNA from isolate cells [see [Grun and van Oudenaarden (2015)](http://www.ncbi.nlm.nih.gov/pubmed/26544934), [Saliba et al. (2014)](http://www.ncbi.nlm.nih.gov/pubmed/25053837) and [Kolodziejczyk et al. (2015)](http://www.ncbi.nlm.nih.gov/pubmed/26000846)]
+		* Choice to use synthetic spike-ins or not (or unique molecular identifiers UMIs) [see [Stegle et al. (2015)](http://www.ncbi.nlm.nih.gov/pubmed/25628217)]
+			* Spike-ins can take up a HUGE percentage of "read landscape" in sequencing
+			* UMIs can remove amplification bias, but are 5' or 3' end biased (bad for isoform or allele-specific expression)
+		* Choice of sequencing platform, time and budget constraints. 
+* Trade-off between number of cells and sequencing depth
+	* Not many papers on determining min number of cells to sequence for a given biological question
+	* Most papers focus on min sequencing depths to observe majority of expressed genes (~ 500k to 1 million reads) [see [Shalek et al. (2014)](http://www.ncbi.nlm.nih.gov/pubmed/24919153) and [Tung et al. (2016)](http://giphy.com/gifs/barack-obama-president-they-tried-TEFplLVRDMWBi)]
+		
+
+#### Relevant papers 
+
+* [Tung et al. (2016)](http://biorxiv.org/content/early/2016/07/08/062919) - Batch effects and the effective design of single-cell gene expression studies
+* [Bacher and Kendziorski (2016)](http://genomebiology.biomedcentral.com/articles/10.1186/s13059-016-0927-y) - Design and computational analysis of single-cell RNA-sequencing experiments
+* [Hicks et al. (2015)](http://biorxiv.org/content/early/2015/12/27/025528) - On the widespread and critical impact of systematic bias and batch effects in single-cell RNA-Seq data
+* [Grun and van Oudenaarden (2015)](http://www.ncbi.nlm.nih.gov/pubmed/26544934) - Design and Analysis of Single-Cell Sequencing Experiments
+
 
 ## Other resources
 
@@ -57,7 +75,7 @@ See Monocle, Seurat too.
 	* [Workshop on single-cell differential expression and gene set enrichment with MAST from Andrew McDavid](http://bioconductor.org/help/course-materials/2016/BioC2016/ConcurrentWorkshops2/McDavid.html)
 * [Bioconductor Workflow for basic analyses of scRNA-Seq data](http://bioconductor.org/help/workflows/simpleSingleCell/)
 * [RNA-seq analysis resources from crazyhottommy](https://github.com/crazyhottommy/RNA-seq-analysis#single-cell-rna-seq) - Very broad list that includes some single cell RNA-seq packages and papers.
-* Analysis of single-cell RNA-seq data from Hemberg Lab](http://hemberg-lab.github.io/scRNA.seq.course/index.html) - discusses on scater R/Bioconductor package, expression quantification with UMIs, expression QC, data visualizations, confounding, clustering, identifying 'important genes', ordering cells in pseudo-time and differential expression. 
-* [Harvard STEM Cell Institute Single Cell Workshop 2015](http://hms-dbmi.github.io/scw/) - workshop on common computational analysis techniques for scRNA-seq data from differential expression to subpopulation identification and network analysis. See course description for more information
+* [Analysis of single-cell RNA-seq data from Hemberg Lab](http://hemberg-lab.github.io/scRNA.seq.course/index.html) - discusses scater R/Bioconductor package, expression quantification with UMIs, expression QC, data visualizations, confounding, clustering, identifying 'important genes', ordering cells in pseudo-time and differential expression. 
+* [Harvard STEM Cell Institute Single Cell Workshop 2015](http://hms-dbmi.github.io/scw/) - workshop on common computational analysis techniques for scRNA-seq data from differential expression to subpopulation identification and network analysis.
 
 

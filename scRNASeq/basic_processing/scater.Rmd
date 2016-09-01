@@ -64,12 +64,14 @@ This class holds the expression values. Class structure is derived from the `Exp
 5. epigenetic info or FACS marker expression
 
 To create a `SCESet` object, use `newSCESet()` and provided three data sets: 
-    * `countData` = numeric matrix of counts (rows = genes, columns = cells). In this case, the `exprs` slot in the object will be generated as `log2(counts-per-million)` using the `cpm()` function from `edgeR`, with a "prior count" value of 1.
-    * `phenoData` = An `AnnotatedDataFrame` describing phenotypic information for each cell (group, batch, etc)
-    * `featureData` = An `AnnotatedDataFrame` describing gene-level information for each gene (e.g. gc content, ensemble gene name, etc)
+
+* `countData` = numeric matrix of counts (rows = genes, columns = cells). In this case, the `exprs` slot in the object will be generated as `log2(counts-per-million)` using the `cpm()` function from `edgeR`, with a "prior count" value of 1.
+* `phenoData` = An `AnnotatedDataFrame` describing phenotypic information for each cell (group, batch, etc)
+* `featureData` = An `AnnotatedDataFrame` describing gene-level information for each gene (e.g. gc content, ensemble gene name, etc)
     
 You can also provide the normalized expression values without needing to provide the count data
-    * `exprsData` = numeric matrix of expression values (rows = genes, columns = cells). The `scater` vignette states: "Typically these should be `log2(counts-per-million)` values or `log2(reads-per-kilobase-per-million-mapped)`, appropriately normalised of course. The package will generally assume that these are the values to use for expression." You can add the count data afterwards using the `counts(object)` function. 
+
+* `exprsData` = numeric matrix of expression values (rows = genes, columns = cells). The `scater` vignette states: "Typically these should be `log2(counts-per-million)` values or `log2(reads-per-kilobase-per-million-mapped)`, appropriately normalised of course. The package will generally assume that these are the values to use for expression." You can add the count data afterwards using the `counts(object)` function. 
 
 
 # Reading in Data

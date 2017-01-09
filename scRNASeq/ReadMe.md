@@ -7,7 +7,7 @@ This is Github repo containing notes / usage examples for analyzing single-cell 
 * cellity [[bioC link](https://bioconductor.org/packages/release/bioc/html/cellity.html)] - classification of low quality cells in scRNA-Seq data
 * scLVM [[GitHub link](https://github.com/PMBio/scLVM)] - Dissects the observed heterogeneity into different sources, thereby allowing for the correction of confounding sources of variation. scLVM was primarily designed to account for cell-cycle induced variations in single-cell RNA-seq data where cell cycle is the primary source of variability.
 * [scater](https://github.com/stephaniehicks/bioconductorNotes/blob/master/scRNASeq/basic_processing/scater.Rmd) [[bioC link](https://www.bioconductor.org/packages/release/bioc/html/scater.html)] - This R/Bioconductor package includes (1) QC metrics, (2) transcript quantification using Kallisto, (3) many functions for data visualization.
-* SCONE [[GitHub link](https://github.com/YosefLab/scone)] - Stands for 'Single-Cell Overview of Normalized Expression'. Includes quality control metrics and normalization. 
+* SCONE [[bioC link](http://bioconductor.org/packages/devel/bioc/html/scone.html)] - Stands for 'Single-Cell Overview of Normalized Expression'. Includes quality control metrics and normalization. 
 * [scran](https://github.com/stephaniehicks/bioconductorNotes/blob/master/scRNASeq/basic_processing/scran.Rmd) [[bioC link](http://bioconductor.org/packages/release/bioc/html/scran.html)] - Basic analyses for scRNA-Seq data. This R/Bioconductor package (1) estimates [pool-based and spike-in based normalization size factors](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-016-0947-7), (2) assigns cells to cell cycle phases, (3) detects highly variable and correlated genes across cells.
 
 
@@ -25,6 +25,9 @@ See Seurat below too.
 * [monocle](https://github.com/stephaniehicks/bioconductorNotes/blob/master/scRNASeq/ordered_pseudotime/monocle.Rmd) [[bioC link](https://bioconductor.org/packages/release/bioc/html/monocle.html)] - time-series analysis (but also does differential expression)
 * slingshot [[GitHub link](https://github.com/kstreet13/slingshot)] - functions for identifying and characterizing continuous developmental trajectories in single-cell sequencing data
 * TSCAN [[GitHub link](https://github.com/zji90/TSCAN)] - Pseudo-time reconstruction and evaluation in scRNA-Seq data
+* SPRING [[GitHub link](https://github.com/AllonKleinLab/SPRING/)] - data viz tool for differentiation trajectories. 
+    * Allows user to see full complex cell states (similar to using t-SNE on HGV) AND shows user trajectories between states (similar to using diffusion maps)
+
 
 
 ## differential expression and/or gene set enrichment analysis
@@ -43,12 +46,13 @@ See Monocle, Seurat too.
 * Seurat [[R package link](http://www.satijalab.org/seurat.html)] - This R package can (1) identify highly variable genes, (2) perform dimensionality reduction (PCA, ICA, t-SNE), (3) perform standard unsupervised clustering algorithms (density clustering, hierarchical clustering, k-means) for cell types and states, (4) tests for differentially expressed genes and (5) spatial reconstruction 
 
 
-## Experimental Design
+## Experimental design and power analyses
 
 * Similar to bulk RNA-Seq, it is important to randomize (or balance) design across as many factors as possible to not introduce artifacts imposed from sample preparation or data collection
 	* Potential limiting factors in experimental design that must be balanced with experimental design: 
 		* Protocols to isolate cells [see [Saliba et al. (2014)](http://www.ncbi.nlm.nih.gov/pubmed/25053837) and [Kolodziejczyk et al. (2015)](http://www.ncbi.nlm.nih.gov/pubmed/26000846)]
 		* Protocols to extract mRNA from isolate cells [see [Grun and van Oudenaarden (2015)](http://www.ncbi.nlm.nih.gov/pubmed/26544934), [Saliba et al. (2014)](http://www.ncbi.nlm.nih.gov/pubmed/25053837) and [Kolodziejczyk et al. (2015)](http://www.ncbi.nlm.nih.gov/pubmed/26000846)]
+		* Protocols for amplification methods [see [Dueck et al. (2016)](https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-016-3300-3)]
 		* Choice to use synthetic spike-ins or not (or unique molecular identifiers UMIs) [see [Stegle et al. (2015)](http://www.ncbi.nlm.nih.gov/pubmed/25628217)]
 			* Spike-ins can take up a HUGE percentage of "read landscape" in sequencing
 			* UMIs can remove amplification bias, but are 5' or 3' end biased (bad for isoform or allele-specific expression)
@@ -64,7 +68,7 @@ See Monocle, Seurat too.
 * [Bacher and Kendziorski (2016)](http://genomebiology.biomedcentral.com/articles/10.1186/s13059-016-0927-y) - Design and computational analysis of single-cell RNA-sequencing experiments
 * [Hicks et al. (2015)](http://biorxiv.org/content/early/2015/12/27/025528) - On the widespread and critical impact of systematic bias and batch effects in single-cell RNA-Seq data
 * [Grun and van Oudenaarden (2015)](http://www.ncbi.nlm.nih.gov/pubmed/26544934) - Design and Analysis of Single-Cell Sequencing Experiments
-
+* [Svensson et al. (2016)](http://biorxiv.org/content/early/2016/09/08/073692) - Power Analysis of Single Cell RNA?Sequencing Experiments
 
 ## Other resources
 
